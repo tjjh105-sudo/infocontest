@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E起挺 Taiwan - 選球眼極限特訓 (愛國旗艦版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #1a2e1a;
+            color: white;
+            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+            overflow: hidden;
+            touch-action: manipulation;
+            user-select: none;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 600px;
+            margin: 0 auto;
+            background: linear-gradient(to bottom, #2d5a27 0%, #1e3c1a 100%);
+            border: 4px solid #444;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        /* 教練角色樣式 */
+        .coach-wrapper {
+            position: absolute;
+            bottom: -10px;
+            left: -20px;
+            width: 300px;
+            height: 420px;
+            transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.5s ease;
+            z-index: 55;
+            pointer-events: none;
+        }
+        .coach-svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(5px 5px 15px rgba(0,0,0,0.6));
+            animation: coach-idle 3s ease-in-out infinite;
+        }
+        @keyframes coach-idle {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-5px) rotate(0.5deg); }
+        }
+        /* 說話時嘴巴動畫 */
+        .talking #coach-mouth {
+            animation: mouth-talk 0.2s infinite;
+        }
+        @keyframes mouth-talk {
+            0%, 100% { d: path("M90 135 Q100 135 110 135"); }
+            50% { d: path("M85 135 Q100 155 115 135"); }
+        }
+
+        /* 對話框 */
+        .speech-bubble {
+            position: absolute;
+            bottom: 320px;
+            left: 200px;
+            background: white;
+            color: #1a365d;
+            padding: 20px 30px;
+            border-radius: 24px;
+            max-width: 340px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+            font-weight: bold;
+            font-size: 1.1rem;
+            opacity: 0;
+            transform: translateY(20px) scale(0.9);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 60;
+            border: 3px solid #1e40af;
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: 40px;
+            border-width: 20px 20px 0;
+            border-style: solid;
+            border-color: white transparent transparent;
+        }
+        .speech-bubble.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        /* 遊戲元素 */
+        .strike-zone {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 220px;
+            height: 280px;
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            pointer-events: none;
+            z-index: 5;
+            background: rgba(255,255,255,0.05);
+            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+        }
+        .strike-zone div {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        #ball {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: radial-gradient(circle at 30% 30%, #fff, #ddd);
+            border-radius: 50%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            display: none;
+            z-index: 10;
+        }
+        /* 縫線 */
+        #ball::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border: 2px dashed rgba(255,0,0,0.5);
+            border-radius: 50%;
+            transform: rotate(45deg);
+        }
+
+        #timer-container {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 320px;
+            height: 16px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            overflow: hidden;
+            display: none;
+            z-index: 20;
+        }
+        #timer-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to right, #ef4444, #eab308, #22c55e);
+            transition: width 0.05s linear;
+        }
+
+        .feedback-popup {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%) scale(0.5);
+            padding: 1rem 3rem;
+            border-radius: 1rem;
+            font-weight: 900;
+            font-size: 2.5rem;
+            z-index: 70;
+            opacity: 0;
+            white-space: nowrap;
+            text-shadow: 3px 3px 0px rgba(0,0,0,0.3);
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+            border: 4px solid white;
+        }
+        .feedback-popup.show {
+            opacity: 1;
+            transform: translateX(-50%) scale(1);
+        }
+
+        .btn-action {
+            transition: all 0.1s;
+        }
+        .btn-action:active:not(:disabled) {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #000;
+        }
+        
+        /* 音量波紋 */
+        .music-bars {
+            display: flex;
+            align-items: flex-end;
+            height: 20px;
+            gap: 3px;
+        }
+        .music-bar {
+            width: 4px;
+            background: #fbbf24;
+            animation: music-bounce 0.5s infinite;
+        }
+        @keyframes music-bounce {
+            0%, 100% { height: 20%; }
+            50% { height: 100%; }
+        }
+
+        /* 國旗飄揚動畫 */
+        @keyframes wave {
+            0%, 100% { transform: rotate(5deg); }
+            50% { transform: rotate(-5deg); }
+        }
+        .flag-wave {
+            animation: wave 3s ease-in-out infinite;
+            transform-origin: top left;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="mb-4 text-center select-none">
+        <h1 class="text-4xl font-black text-yellow-400 tracking-widest drop-shadow-md">E起挺 Taiwan!</h1>
+        <p class="text-gray-300 font-bold tracking-wide">2024 世界棒球 12 強 - 極限選球特訓</p>
+    </div>
+
+    <div id="game-container">
+        <!-- 右上方國旗 -->
+        <div class="absolute top-4 right-4 z-40 flag-wave filter drop-shadow-lg">
+            <svg width="80" height="53" viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg">
+                <!-- 紅底 -->
+                <rect width="300" height="200" fill="#FE0000"/>
+                <!-- 藍天 -->
+                <rect width="150" height="100" fill="#000095"/>
+                <!-- 白日 -->
+                <g transform="translate(75, 50)">
+                    <!-- 12道光芒 -->
+                    <path d="M0,-37.5 L8,-18 L26,-26 L18,-8 L37.5,0 L18,8 L26,26 L8,18 L0,37.5 L-8,18 L-26,26 L-18,8 L-37.5,0 L-18,-8 L-26,-26 L-8,-18 Z" fill="#FFFFFF"/>
+                    <!-- 白日圓心 -->
+                    <circle r="15" fill="#FFFFFF" stroke="#000095" stroke-width="2"/>
+                </g>
+            </svg>
+        </div>
+
+        <!-- 音樂指示器 (位置下移以避開國旗) -->
+        <div id="audio-status" class="absolute top-20 right-4 z-50 flex items-center gap-2 bg-black/60 px-3 py-1 rounded-full border border-yellow-500/50 hidden">
+            <span class="text-xs text-yellow-400 font-bold">BGM ON</span>
+            <div class="music-bars">
+                <div class="music-bar" style="animation-delay: 0s"></div>
+                <div class="music-bar" style="animation-delay: 0.1s"></div>
+                <div class="music-bar" style="animation-delay: 0.2s"></div>
+            </div>
+        </div>
+
+        <!-- 教練層 -->
+        <div id="intro-layer" class="absolute inset-0 z-50 pointer-events-none">
+            <div id="coach-box" class="coach-wrapper opacity-0 translate-y-40">
+                <svg class="coach-svg" viewBox="0 0 200 350" xmlns="http://www.w3.org/2000/svg">
+                    <!-- 身體 -->
+                    <path d="M60 340 L60 220 Q60 160 100 160 Q140 160 140 220 L140 340" fill="#1e3a8a"/> 
+                    <path d="M70 340 L70 280 H130 L130 340" fill="#f8fafc"/> 
+                    <path d="M70 340 H85 L80 345 H65 Z" fill="#334155"/> 
+                    <path d="M115 340 H130 L135 345 H120 Z" fill="#334155"/>
+                    <!-- 手臂 (抱胸) -->
+                    <path d="M60 180 Q30 220 50 260" stroke="#1e3a8a" stroke-width="20" fill="none" stroke-linecap="round"/>
+                    <path d="M140 180 Q170 220 150 260" stroke="#1e3a8a" stroke-width="20" fill="none" stroke-linecap="round"/>
+                    <!-- 戰術板 -->
+                    <rect x="140" y="240" width="40" height="50" fill="#e2e8f0" rx="2" transform="rotate(-10 160 265)" stroke="#64748b" stroke-width="1"/>
+                    
+                    <!-- 頭部 -->
+                    <circle cx="100" cy="110" r="45" fill="#ffdbac"/> 
+                    
+                    <!-- 精緻雙片墨鏡 -->
+                    <g id="sunglasses-pro">
+                        <defs>
+                            <linearGradient id="lens-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style="stop-color:#333;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#000;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+                        <!-- 鏡框連接 -->
+                        <path d="M92 105 H108" stroke="#111" stroke-width="4"/>
+                        <!-- 左鏡片 -->
+                        <path d="M58 100 Q58 95 75 95 Q92 95 92 100 L90 115 Q90 125 75 125 Q60 125 60 115 Z" fill="url(#lens-grad)" stroke="#111" stroke-width="2"/>
+                        <path d="M65 102 L80 102" stroke="white" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+                        <!-- 右鏡片 -->
+                        <path d="M108 100 Q108 95 125 95 Q142 95 142 100 L140 115 Q140 125 125 125 Q110 125 110 115 Z" fill="url(#lens-grad)" stroke="#111" stroke-width="2"/>
+                        <path d="M115 102 L130 102" stroke="white" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+                    </g>
+
+                    <!-- 棒球帽 -->
+                    <path d="M55 75 Q100 30 145 75 L155 95 H45 Z" fill="#1e3a8a"/> 
+                    <path d="M145 75 L180 85 L175 95 H145" fill="#1e3a8a"/> 
+                    
+                    <!-- 帽子上的中華民國國旗 -->
+                    <g transform="translate(87, 50) scale(0.08)">
+                        <rect width="300" height="200" fill="#FE0000"/>
+                        <rect width="150" height="100" fill="#000095"/>
+                        <g transform="translate(75, 50)">
+                            <path d="M0,-37.5 L8,-18 L26,-26 L18,-8 L37.5,0 L18,8 L26,26 L8,18 L0,37.5 L-8,18 L-26,26 L-18,8 L-37.5,0 L-18,-8 L-26,-26 L-8,-18 Z" fill="#FFFFFF"/>
+                            <circle r="15" fill="#FFFFFF" stroke="#000095" stroke-width="2"/>
+                        </g>
+                    </g>
+
+                    <!-- 嘴巴 -->
+                    <path id="coach-mouth" d="M90 135 Q100 135 110 135" stroke="#92400e" stroke-width="3" fill="none" stroke-linecap="round"/> 
+                </svg>
+            </div>
+            
+            <div id="dialogue" class="speech-bubble">
+                <p id="dialogue-text">教練準備中...</p>
+                <div class="text-right mt-4">
+                    <button id="next-btn" class="pointer-events-auto bg-blue-600 text-white px-6 py-2 rounded-full font-bold hover:bg-blue-700 transition-colors shadow-lg transform active:scale-95">了解 ➔</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 頂部資訊 (遊戲中) -->
+        <div id="game-ui" class="absolute top-4 left-4 right-4 flex justify-between items-start z-20 opacity-0 transition-opacity duration-500">
+            <div class="bg-black/80 p-4 rounded-xl border-l-4 border-yellow-500 backdrop-blur-sm">
+                <div class="text-xs text-yellow-400 font-bold uppercase tracking-widest mb-1">PITCH TYPE</div>
+                <div id="pitch-name" class="text-2xl font-black text-white tracking-wide">READY</div>
+            </div>
+            <div class="bg-black/80 p-4 rounded-xl border-r-4 border-blue-500 backdrop-blur-sm text-right mt-16 mr-[-10px] scale-90"> <!-- 稍微移動分數板避開國旗 -->
+                <div class="text-sm text-gray-300 font-bold">SCORE: <span id="score" class="text-yellow-400 text-xl">0</span></div>
+                <div class="text-sm text-gray-300 font-bold">BALL: <span id="pitch-count" class="text-white">0</span> / 5</div>
+            </div>
+        </div>
+
+        <!-- 好球帶 -->
+        <div class="strike-zone">
+            <div></div><div></div><div></div>
+            <div></div><div></div><div></div>
+            <div></div><div></div><div></div>
+        </div>
+
+        <div id="timer-container">
+            <div id="timer-bar"></div>
+        </div>
+        
+        <div id="ball"></div>
+        <div id="feedback" class="feedback-popup"></div>
+
+        <!-- 結束畫面 -->
+        <div id="end-screen" class="absolute inset-0 bg-black/95 hidden flex flex-col items-center justify-center z-50 p-8 text-center">
+            <h2 class="text-5xl font-black mb-4 text-white italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">MISSION REPORT</h2>
+            <div id="final-score" class="text-8xl font-black text-white mb-6 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">0%</div>
+            <div id="final-stats" class="text-2xl mb-8 text-gray-300 font-bold"></div>
+            <div id="technical-advice" class="bg-indigo-900/60 p-6 rounded-2xl mb-10 max-w-lg text-left border border-indigo-500/50 backdrop-blur-md shadow-2xl"></div>
+            <button onclick="restartGame()" class="bg-white text-blue-900 font-black py-4 px-12 rounded-full text-xl hover:bg-gray-200 transition-transform active:scale-95 shadow-lg">再來一局</button>
+        </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div id="controls" class="mt-6 flex gap-6 w-full max-w-[800px] opacity-50 pointer-events-none transition-opacity duration-500">
+        <button id="btn-ball" onclick="makeDecision('ball')" class="btn-action flex-1 bg-gradient-to-b from-blue-700 to-blue-900 hover:from-blue-600 hover:to-blue-800 py-6 rounded-2xl text-3xl font-black shadow-[0_6px_0_#1e3a8a] border border-blue-400/30 text-white">
+            壞球 BALL
+        </button>
+        <button id="btn-strike" onclick="makeDecision('strike')" class="btn-action flex-1 bg-gradient-to-b from-red-700 to-red-900 hover:from-red-600 hover:to-red-800 py-6 rounded-2xl text-3xl font-black shadow-[0_6px_0_#7f1d1d] border border-red-400/30 text-white">
+            好球 STRIKE
+        </button>
+    </div>
+
+    <script>
+        const el = id => document.getElementById(id);
+        const ballEl = el('ball');
+        const pitchNameEl = el('pitch-name');
+        const scoreEl = el('score');
+        const countEl = el('pitch-count');
+        const feedbackEl = el('feedback');
+        const endScreen = el('end-screen');
+        const timerContainer = el('timer-container');
+        const timerBar = el('timer-bar');
+        const btnStrike = el('btn-strike');
+        const btnBall = el('btn-ball');
+        const introLayer = el('intro-layer');
+        const coachBox = el('coach-box');
+        const dialogueEl = el('dialogue');
+        const dialogueTextEl = el('dialogue-text');
+        const nextBtn = el('next-btn');
+        const coachMouth = el('coach-mouth');
+        const controls = el('controls');
+        const gameUI = el('game-ui');
+        const audioStatus = el('audio-status');
+
+        let score = 0;
+        let pitchCount = 0;
+        const TOTAL_PITCHES = 5;
+        let isPitching = false;
+        let userDecision = null;
+        let animationId = null;
+        const stats = { correct: 0, wrong: 0 };
+        let audioContext = null;
+        let bgmOscillators = [];
+        let isGameStarted = false;
+
+        // Pitch Types
+        const PITCH_TYPES = [
+            { name: "四縫線快速球", speed: 0.025, color: "#ef4444", getPos: (t, s, e) => ({ x: s.x + (e.x - s.x) * t, y: s.y + (e.y - s.y) * t, scale: 0.5 + t * 4.5 }) },
+            { name: "曲球 (Curve)", speed: 0.016, color: "#eab308", getPos: (t, s, e) => ({ x: s.x + (e.x - s.x) * t + (Math.sin(t * 3) * 40), y: s.y + (e.y - s.y) * t + Math.sin(t * Math.PI) * 160, scale: 0.5 + t * 4.5 }) },
+            { name: "滑球 (Slider)", speed: 0.019, color: "#3b82f6", getPos: (t, s, e) => ({ x: s.x + (e.x - s.x) * t + (t * t * 140), y: s.y + (e.y - s.y) * t + 30, scale: 0.5 + t * 4.5 }) },
+            { name: "卡特球 (Cutter)", speed: 0.022, color: "#f97316", getPos: (t, s, e) => ({ x: s.x + (e.x - s.x) * t - (t > 0.6 ? (t - 0.6) * 120 : 0), y: s.y + (e.y - s.y) * t, scale: 0.5 + t * 4.5 }) }
+        ];
+
+        // --- 教練劇本 ---
+        const intros = [
+            "二零二四世界棒球十二強賽火熱開打！我們全台灣都要團結起來挺台灣！",
+            "我是你的特訓教練。看我這副雙片墨鏡，就能透視所有投手的球種！",
+            "要在國際舞台上贏球，『選球眼』就是最強的武器。不管是快速球還是刁鑽的滑球，都別想騙過你。",
+            "集中精神，聽著這熱血的音樂，踏入擊球區展現你的練習成果吧！"
+        ];
+        let introIdx = 0;
+
+        // --- Audio Engine (Web Audio API) ---
+        const AudioEngine = {
+            ctx: null,
+            bgmGain: null,
+            isPlaying: false,
+            tempo: 120,
+            nextNoteTime: 0,
+            timerID: null,
+            mode: 'intro',
+            
+            init() {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioContext();
+                this.bgmGain = this.ctx.createGain();
+                this.bgmGain.gain.value = 0.4; // 音量大聲
+                this.bgmGain.connect(this.ctx.destination);
+            },
+
+            resume() {
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+
+            playTone(freq, duration, type = 'sine', time, vol = 1) {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, time);
+                gain.gain.setValueAtTime(vol, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+                osc.connect(gain);
+                gain.connect(this.bgmGain);
+                osc.start(time);
+                osc.stop(time + duration);
+            },
+
+            playKick(time) {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.frequency.setValueAtTime(150, time);
+                osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.15);
+                gain.gain.setValueAtTime(0.5, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+                osc.connect(gain);
+                gain.connect(this.bgmGain);
+                osc.start(time);
+                osc.stop(time + 0.15);
+            },
+
+            scheduler() {
+                while (this.nextNoteTime < this.ctx.currentTime + 0.1) {
+                    this.scheduleNote(this.nextNoteTime);
+                    this.nextNoteTime += (60 / this.tempo) / 4; 
+                }
+                this.timerID = setTimeout(() => this.scheduler(), 25);
+            },
+
+            currentStep: 0,
+            scheduleNote(time) {
+                const step = this.currentStep % 16;
+                
+                if (this.mode === 'intro') {
+                    // Intro Melody (Calm)
+                    this.tempo = 100;
+                    if (step % 4 === 0) {
+                        const notes = [261.6, 329.6, 392.0, 523.2]; 
+                        this.playTone(notes[(step/4)%4], 0.3, 'sine', time, 0.3);
+                    }
+                } else {
+                    // Game Melody (Intense)
+                    this.tempo = 145; 
+                    if (step % 4 === 0) this.playKick(time);
+                    if (step % 2 === 0) this.playTone(8000, 0.05, 'triangle', time, 0.05);
+                    if (step % 4 === 2) this.playTone(130.8, 0.2, 'sawtooth', time, 0.4);
+                    const melody = [392, 440, 523, 587, 659, 587, 523, 440]; 
+                    if (step % 2 === 0) this.playTone(melody[(step/2)%8], 0.1, 'square', time, 0.15);
+                }
+                this.currentStep++;
+            },
+
+            startBGM(mode = 'intro') {
+                if (!this.ctx) this.init();
+                this.resume();
+                this.mode = mode;
+                if (this.isPlaying) return;
+                this.isPlaying = true;
+                this.nextNoteTime = this.ctx.currentTime + 0.1;
+                this.currentStep = 0;
+                this.scheduler();
+                audioStatus.classList.remove('hidden');
+            },
+
+            setMode(mode) { this.mode = mode; },
+            stop() { clearTimeout(this.timerID); this.isPlaying = false; }
+        };
+
+        // --- Voice Engine (SpeechSynthesis) ---
+        const VoiceEngine = {
+            speak(text) {
+                if (!window.speechSynthesis) return;
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                const voices = window.speechSynthesis.getVoices();
+                const zhVoice = voices.find(v => v.lang.includes('zh-TW')) || voices.find(v => v.lang.includes('zh'));
+                if (zhVoice) utterance.voice = zhVoice;
+                utterance.rate = 1.1; 
+                utterance.pitch = 1.0;
+                utterance.onstart = () => {
+                    document.getElementById('coach-svg').classList.add('talking');
+                    if (AudioEngine.bgmGain) AudioEngine.bgmGain.gain.setTargetAtTime(0.1, AudioEngine.ctx.currentTime, 0.1); 
+                };
+                utterance.onend = () => {
+                    document.getElementById('coach-svg').classList.remove('talking');
+                    if (AudioEngine.bgmGain) AudioEngine.bgmGain.gain.setTargetAtTime(0.4, AudioEngine.ctx.currentTime, 0.1); 
+                };
+                window.speechSynthesis.speak(utterance);
+            }
+        };
+
+        document.querySelector('.coach-svg').id = 'coach-svg';
+
+        window.onload = () => {
+            setTimeout(() => {
+                coachBox.classList.remove('opacity-0', 'translate-y-40');
+                dialogueEl.classList.add('active');
+                dialogueTextEl.innerText = intros[0];
+            }, 500);
+            window.speechSynthesis.getVoices();
+        };
+
+        // --- Logic ---
+        function showNextDialogue() {
+            if (introIdx < intros.length) {
+                const text = intros[introIdx];
+                dialogueTextEl.innerText = text;
+                VoiceEngine.speak(text);
+                introIdx++;
+                if (introIdx >= intros.length) nextBtn.innerText = "踏入擊球區 ➔";
+            } else {
+                dialogueEl.classList.remove('active');
+                setTimeout(() => {
+                    coachBox.style.transform = "translateX(-300px)";
+                    introLayer.style.pointerEvents = 'none';
+                    setTimeout(() => {
+                        introLayer.style.display = 'none';
+                        startGameSequence();
+                    }, 800);
+                }, 500);
+            }
+        }
+
+        nextBtn.onclick = () => {
+            if (!AudioEngine.isPlaying) {
+                AudioEngine.startBGM('intro');
+                VoiceEngine.speak(intros[0]);
+                introIdx = 1;
+            } else {
+                showNextDialogue();
+            }
+        };
+
+        function startGameSequence() {
+            AudioEngine.setMode('game');
+            controls.style.opacity = '1';
+            controls.style.pointerEvents = 'auto';
+            gameUI.style.opacity = '1';
+            score = 0; pitchCount = 0; stats.correct = 0; stats.wrong = 0;
+            updateUI();
+            setTimeout(nextPitch, 1500);
+        }
+
+        function restartGame() {
+            endScreen.classList.add('hidden');
+            startGameSequence(); // Skip intro, direct start
+        }
+
+        function updateUI() {
+            scoreEl.innerText = score;
+            countEl.innerText = pitchCount;
+        }
+
+        function nextPitch() {
+            if (pitchCount >= TOTAL_PITCHES) { showEndScreen(); return; }
+            pitchCount++; updateUI();
+            isPitching = true; userDecision = null;
+            btnStrike.disabled = false; btnBall.disabled = false;
+            timerContainer.style.display = 'block'; timerBar.style.width = '100%';
+            feedbackEl.classList.remove('show');
+            currentPitch = PITCH_TYPES[Math.floor(Math.random() * PITCH_TYPES.length)];
+            pitchNameEl.innerText = currentPitch.name;
+            pitchNameEl.style.color = currentPitch.color;
+            const startPos = { x: 400, y: 250 };
+            const isInZone = Math.random() > 0.45;
+            let targetX, targetY;
+            if (isInZone) { targetX = 315 + Math.random() * 170; targetY = 190 + Math.random() * 220; }
+            else {
+                const side = Math.floor(Math.random() * 4);
+                if (side === 0) { targetX = 210; targetY = 150 + Math.random() * 300; }
+                else if (side === 1) { targetX = 590; targetY = 150 + Math.random() * 300; }
+                else if (side === 2) { targetX = 400; targetY = 110; }
+                else { targetX = 400; targetY = 490; }
+            }
+            let t = 0; const DECISION_LIMIT = 0.75; 
+            ballEl.style.display = 'block';
+            function animate() {
+                t += currentPitch.speed;
+                const timeLeft = Math.max(0, (DECISION_LIMIT - t) / DECISION_LIMIT);
+                timerBar.style.width = (timeLeft * 100) + '%';
+                if (timeLeft < 0.3) timerBar.style.background = '#ef4444';
+                else if (timeLeft < 0.6) timerBar.style.background = '#eab308';
+                else timerBar.style.background = '#22c55e';
+                if (t >= DECISION_LIMIT && userDecision === null) { btnStrike.disabled = true; btnBall.disabled = true; timerBar.style.width = '0%'; }
+                if (t >= 1) { finishPitch(isInZone); return; }
+                const pos = currentPitch.getPos(t, startPos, { x: targetX, y: targetY });
+                ballEl.style.left = pos.x + 'px'; ballEl.style.top = pos.y + 'px'; 
+                ballEl.style.transform = `translate(-50%, -50%) scale(${pos.scale})`;
+                animationId = requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        function makeDecision(type) {
+            if (!isPitching || userDecision !== null) return;
+            userDecision = type;
+            btnStrike.disabled = true; btnBall.disabled = true;
+            feedbackEl.innerText = type === 'strike' ? "⚡ 好球!" : "👁️ 壞球!";
+            feedbackEl.style.backgroundColor = type === 'strike' ? "#b91c1c" : "#1d4ed8";
+            feedbackEl.style.borderColor = "white";
+            feedbackEl.classList.add('show');
+        }
+
+        function finishPitch(isInZone) {
+            isPitching = false; cancelAnimationFrame(animationId);
+            ballEl.style.display = 'none'; timerContainer.style.display = 'none';
+            let msg = ""; let speakText = ""; let isCorrect = false;
+            if (userDecision === null) {
+                msg = "太慢了!"; speakText = "太慢了！要果斷一點！"; stats.wrong++;
+                feedbackEl.style.backgroundColor = "#555";
+            } else if (userDecision === 'strike') {
+                if (isInZone) { isCorrect = true; msg = "正中好球!"; speakText = "漂亮！這是一顆好球！"; score += 20; stats.correct++; feedbackEl.style.backgroundColor = "#16a34a"; }
+                else { isCorrect = false; msg = "追打壞球!"; speakText = "看清楚！那是壞球！"; stats.wrong++; feedbackEl.style.backgroundColor = "#dc2626"; }
+            } else {
+                if (!isInZone) { isCorrect = true; msg = "精準選球!"; speakText = "選得好！沒被騙到！"; score += 20; stats.correct++; feedbackEl.style.backgroundColor = "#16a34a"; }
+                else { isCorrect = false; msg = "漏掉好球!"; speakText = "可惜！那是好球啊！"; stats.wrong++; feedbackEl.style.backgroundColor = "#dc2626"; }
+            }
+            feedbackEl.innerText = msg;
+            feedbackEl.classList.add('show');
+            VoiceEngine.speak(speakText);
+            setTimeout(() => { setTimeout(nextPitch, 800); }, 1000); 
+        }
+
+        function showEndScreen() {
+            endScreen.classList.remove('hidden');
+            controls.style.opacity = '0';
+            AudioEngine.setMode('intro'); 
+            const scorePercent = Math.round((score / 100) * 100);
+            el('final-score').innerText = scorePercent + "%";
+            el('final-stats').innerHTML = `戰績：${stats.correct} 勝 / ${stats.wrong} 敗`;
+            let advice = "", speakText = "";
+            if (scorePercent === 100) { advice = "你是台灣隊的救星！"; speakText = "太神了！你的選球眼已經是職業水準！"; }
+            else if (scorePercent >= 60) { advice = "表現不錯，繼續保持！"; speakText = "表現不錯，但還要再穩一點！"; }
+            else { advice = "還需要特訓，別灰心！"; speakText = "別灰心！多練習幾次抓節奏！"; }
+            el('technical-advice').innerText = advice;
+            VoiceEngine.speak(speakText);
+        }
+    </script>
+</body>
+</html>
